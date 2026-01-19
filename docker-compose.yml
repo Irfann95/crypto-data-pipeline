@@ -1,0 +1,54 @@
+networks:
+  kafka-net:
+    name: kafka-net
+    driver: bridge
+
+services: 
+  kafka1:
+    image: confluentinc/cp-kafka:7.8.0
+    hostname: kafka1
+    container_name: kafka1
+    ports:
+      - "9092:9092"
+      - "9093:9093"
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_BROKER_ID: 1
+      KAFKA_PROCESS_ROLES: "broker,controller"
+      KAFKA_CONTROLLER_QUORUM_VOTERS: "1@kafka1:9093"
+
+      KAFKA_LISTENERS: "PLAINTEXT://kafka1:29092,PLAINTEXT_HOST://0.0.0.0:9092,CONTROLLER://kafka1:9093"
+      KAFKA_ADVERTISED_LISTENERS: "PLAINTEXT://kafka1:29092,PLAINTEXT_HOST://localhost:9092"
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: "CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT"
+      KAFKA_CONTROLLER_LISTENER_NAMES: "CONTROLLER"
+      KAFKA_INTER_BROKER_LISTENER_NAME: "PLAINTEXT"
+
+      CLUSTER_ID: "EmptNWtoR4GGWx-BH6nGLQ"
+
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_DEFAULT_REPLICATION_FACTOR: 1
+      KAFKA_MIN_INSYNC_REPLICAS: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+
+    volumes:
+      - ./kafka1/data:/var/lib/kafka/data
+    networks:
+      - kafka-net
+    healthcheck:
+      test: ["CMD", "bash", "-c", "kafka-broker-api-versions --bootstrap-server kafka1:29092 >/dev/null 2>&1"]
+      interval: 10s
+      timeout: 10s
+      retries: 12
+
+  kafka-producer:
+    build: ./scrapping_crypto/producer
+    container_name: kafka-producer
+    depends_on:
+      kafka1:
+        condition: service_healthy
+    networks:
+      - kafka-net
+    restart: always
+    environment:
+      KAFKA_BOOTSTRAP_SERVERS: kafka1:29092
+      PYTHONUNBUFFERED: "1"
